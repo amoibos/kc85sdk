@@ -14,7 +14,7 @@ valid_systems = ['kc85_3', 'kc85_4']
 config = {
     'sdcc': 'sdcc', 
     'sdar': 'sdar',
-    'mess': 'mess64', 
+    'mess': 'mess', 
     'z80asm': 'z80asm',
     'makebin': 'makebin',
     'system': 'kc85_3',
@@ -37,7 +37,7 @@ sdcc_flags = [
 
 #-------------------------------------------------------------------------------
 def error(msg) :
-    print "ERROR: {}".format(msg)
+    print("ERROR: {}".format(msg))
     sys.exit(10)
 
 #-------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ def save_config() :
 def check_tool(tool, arg) :
     try :
         subprocess.check_output([tool, arg], stderr=subprocess.STDOUT)
-        print "'{}' found".format(tool)
+        print("'{}' found".format(tool))
         return True
     except OSError:
         return False
@@ -89,13 +89,13 @@ def do_config() :
     if not check_tool(config['z80asm'], '-help') :
         error("'z80asm' not found in path!")
     save_config()
-    print '.config written'
+    print('.config written')
 
 #-------------------------------------------------------------------------------
 def set_config(key, val) :
     config[key] = val
     save_config()
-    print '.config written'
+    print('.config written')
 
 #-------------------------------------------------------------------------------
 def ensure_dirs() :
@@ -138,7 +138,7 @@ def run_sdcc_exe(system, src) :
     cmd = [config['sdcc'], src, '-DKC85_3=1' if system == 'kc83_3' else '-DKC85_4=1'] 
     cmd.extend(sdcc_flags)
     cmd.extend(['caos.lib', '-L', 'lib/{}'.format(system), '-o', 'bin/{}/'.format(system)])
-    print cmd
+    print(cmd)
     return 0 == subprocess.call(cmd)
 
 #-------------------------------------------------------------------------------
@@ -146,11 +146,11 @@ def run_sdcc_lib(system, sources) :
     ensure_dirs()    
     for src in sources :
         path = 'lib/src/{}.c'.format(src)
-        print '>> {}:'.format(path)
+        print('>> {}:'.format(path))
         cmd = [config['sdcc'], '-c', path]
         cmd.extend(sdcc_flags)
         cmd.extend(['-o', 'bin/{}/'.format(system)])
-        print cmd
+        print(cmd)
         if 0 != subprocess.call(cmd) :
             return False
     else :
@@ -164,7 +164,7 @@ def run_sdar(system, files) :
     cmd = [config['sdar'], '-rc', lib]
     cmd.extend(paths)
     if 0 == subprocess.call(cmd) :
-        print "wrote '{}'".format(lib)
+        print("wrote '{}'".format(lib))
         return True
     else :
         return False
@@ -196,7 +196,7 @@ def pack_kcc_header(name, start, end) :
         };
     '''
     hdr = struct.pack('10s6x7B105x', 
-            name, 
+            name.encode("utf-8"), 
             2,    # number_addresses
             start & 0xFF, (start >> 8) & 0xFF,  # load_address_l, load_address_h
             end & 0xFF, (end >> 8) & 0xFF,      # end_address_l, end_address_h
@@ -213,8 +213,10 @@ def make_test_kcc() :
             '\x23'
             'HELLO WORLD\x0D\x0A\x00'
             '\xC9')
+    code = code.encode("utf-8")
     start = 0x200
     end = start + len(code)
+    #breakpoint()
     kcc = pack_kcc_header('HELLO', start, end) + code
     return kcc
 
@@ -247,7 +249,7 @@ def do_make(system, src) :
         kcc = pack_kcc_header(dst.upper(), start, end) + bin
         with open('bin/{}/{}.kcc'.format(system, dst), 'wb') as kccfile :
             kccfile.write(kcc)
-        print 'wrote bin/{}/{}.kcc'.format(system, dst)
+        print('wrote bin/{}/{}.kcc'.format(system, dst))
 
 #-------------------------------------------------------------------------------
 def do_asm(system, src, dst) :
@@ -262,7 +264,7 @@ def do_asm(system, src, dst) :
             kcc = pack_kcc_header(dst.upper(), start, end) + bin
             with open('bin/{}/{}.kcc'.format(system, dst), 'wb') as kccfile :
                 kccfile.write(kcc)
-            print 'wrote bin/{}/{}.kcc'.format(system, dst)
+            print('wrote bin/{}/{}.kcc'.format(system, dst))
     else :
         error('Failed to assemble {}'.format(src))
 
@@ -287,15 +289,15 @@ def symbol_addr(system, name, brk) :
     if os.path.isfile(map_path) :
         with open(map_path, 'r') as f :
             symbol = '_{} '.format(brk)
-            print "Looking for '{}' in '{}'...".format(symbol, map_path) 
+            print("Looking for '{}' in '{}'...".format(symbol, map_path))
             lines = f.readlines()
             for line in lines :
                 if symbol in line :
                     map_addr = line.split()[0]
-                    print "Found '{}' in '{}' at {}".format(symbol, map_path, map_addr)
+                    print("Found '{}' in '{}' at {}".format(symbol, map_path, map_addr))
                     break
             else :
-                print "...not found."
+                print("...not found.")
     
     # try read symbol from .lab file
     # format is:
@@ -303,13 +305,13 @@ def symbol_addr(system, name, brk) :
     if os.path.isfile(lab_path) :
         with open(lab_path, 'r') as f :
             label = '{}:'.format(brk)
-            print "Looking for '{}' in '{}'...".format(label, lab_path) 
+            print("Looking for '{}' in '{}'...".format(label, lab_path))
             lines = f.readlines()
             for line in lines :
                 if label in line :
                     # address is 3rd element in line, need to strip leading $
                     lab_addr = line.split()[2][1:]
-                    print "Found '{}' in '{}' at {}".format(label, lab_path, lab_addr);
+                    print("Found '{}' in '{}' at {}".format(label, lab_path, lab_addr))
                     break
 
     addr = map_addr if lab_addr is None else lab_addr
@@ -318,14 +320,14 @@ def symbol_addr(system, name, brk) :
 #-------------------------------------------------------------------------------
 def do_debug(system, name, brk) :
 
-    print ('do_debug {} {} {}'.format(system, name, brk))
+    print('do_debug {} {} {}'.format(system, name, brk))
     addr = symbol_addr(system, name, brk)
     with open('bin/{}/__debug.txt'.format(system), 'w') as f :
         if addr :
-            print 'Setting breakpoint at ${}'.format(addr)
-            f.write('go {}'.format(addr));
+            print('Setting breakpoint at ${}'.format(addr))
+            f.write('go {}'.format(addr))
         else :
-            print 'No breakpoint set'
+            print('No breakpoint set')
             f.write(' ')
 
     # call MESS with debugger active
@@ -351,26 +353,26 @@ def do_libs() :
 #===============================================================================
 load_config()
 if len(sys.argv) == 1 or len(sys.argv) == 2 and sys.argv[1] == '-help' or sys.argv[1] == '--help' :
-    print '\nC/ASM SDK for KC85/3 and KC85/4 home computers.\n'
-    print 'kc (cmd) [args...]\n'
-    print 'kc config'
-    print '  run once to configure for your local environment'
-    print 'kc system (kc85_3 or kc85_4)'
-    print '  select default system'
-    print 'kc make c-source'
-    print '  compile c source into program'
-    print 'kc clean'
-    print '  clean build files'
-    print 'kc asm (asm-source) [prog]'
-    print '  assemble asm source into program'
-    print 'kc run (prog)'
-    print '  run a compiled program in MESS'
-    print 'kc debug (prog) [break-func | break-label]'
-    print '  like run, but with debugger activated, optionally break at C func or ASM label'
-    print 'kc test'
-    print "  test run with a hardcoded 'HELLO WORLD' program"
-    print 'kc libs'
-    print '  rebuild caos.lib for kc85_3 and kc85_4\n\n'
+    print('\nC/ASM SDK for KC85/3 and KC85/4 home computers.\n')
+    print('kc (cmd) [args...]\n')
+    print('kc config')
+    print('  run once to configure for your local environment')
+    print('kc system (kc85_3 or kc85_4)')
+    print('  select default system')
+    print('kc make c-source')
+    print('  compile c source into program')
+    print('kc clean')
+    print('  clean build files')
+    print('kc asm (asm-source) [prog]')
+    print('  assemble asm source into program')
+    print('kc run (prog)')
+    print('  run a compiled program in MESS')
+    print('kc debug (prog) [break-func | break-label]')
+    print('  like run, but with debugger activated, optionally break at C func or ASM label')
+    print('kc test')
+    print("  test run with a hardcoded 'HELLO WORLD' program")
+    print('kc libs')
+    print('  rebuild caos.lib for kc85_3 and kc85_4\n\n')
 
 else :
     cmd = sys.argv[1]
@@ -392,7 +394,7 @@ else :
             path = 'bin/{}'.format(system)
             if os.path.isdir(path) :
                 shutil.rmtree(path)
-        print 'done.'
+        print('done.')
     elif cmd == 'asm' :
         src = 'out.s'
         dst = 'out'
